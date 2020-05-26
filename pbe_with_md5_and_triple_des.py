@@ -1,24 +1,12 @@
-"""
-
-    pbe_with_md5_and_triple_des
-    ~~~~~~~~~~~~
-    This module provides ciphers that implement 'PBE With MD5 And Triple DES' and 'PBE With MD5 And DES' algorithms
-
-    :copyright: (c) 2017 by Anton Koba (anton.koba@gmail.com)
-    :license: MIT
-
-"""
-
-from abc import ABC, abstractmethod
+import array
 import base64
 import hashlib
 import os
-import array
+from abc import ABC, abstractmethod
+
 from Crypto.Cipher import DES, DES3
 
-
 BLOCK_LENGTH_BYTES = 8  # pad incoming message to whole length of block
-
 DERIVED_KEY_ITERATIONS = 1000  # cycles to hash over to produce dk and iv
 
 
@@ -51,14 +39,14 @@ class AbstractPBEWithMD5AndDES(ABC):
         salt = os.urandom(8)
 
         # get dk and iv using proper algorithm (either for DES ot DES3), password as bytes
-        (dk, iv) = self._get_derived_key_and_iv(password.encode('utf-8'), salt)
+        (dk, iv) = self._get_derived_key_and_iv(password.encode("utf-8"), salt)
 
         # get proper class (DES/DES3) to instantiate and use for encoding
         des_class = self._get_des_encoder_class()
         des = des_class.new(dk, DES.MODE_CBC, iv)
 
         # do the encryption
-        encrypted_text = des.encrypt(padded_text)
+        encrypted_text = des.encrypt(padded_text.encode("utf-8"))
 
         # return encrypted text prepended with salt, all base64-encoded
         return base64.b64encode(salt + encrypted_text)
@@ -81,7 +69,7 @@ class AbstractPBEWithMD5AndDES(ABC):
         encrypted_text_message = decoded_encrypted_text[8:]
 
         # get dk and iv using proper algorithm (either for DES ot DES3)
-        (dk, iv) = self._get_derived_key_and_iv(password.encode('utf-8'), salt)
+        (dk, iv) = self._get_derived_key_and_iv(password.encode("utf-8"), salt)
 
         # get proper class (DES/DES3) to instantiate and use for decoding
         des_class = self._get_des_encoder_class()
@@ -91,7 +79,7 @@ class AbstractPBEWithMD5AndDES(ABC):
         decrypted_text = des.decrypt(encrypted_text_message)
 
         # return decrypted text with possible padding removed, converted from bytes string to string
-        return str(self._unpad_decrypted_message(decrypted_text), 'utf-8')
+        return str(self._unpad_decrypted_message(decrypted_text), "utf-8")
 
     def _pad_plain_text(self, plain_text):
         """
@@ -101,7 +89,9 @@ class AbstractPBEWithMD5AndDES(ABC):
         :param plain_text: plain text to be padded (bytes)
         :return: padded bytes
         """
-        pad_number = BLOCK_LENGTH_BYTES - (len(plain_text) % BLOCK_LENGTH_BYTES)
+        pad_number = BLOCK_LENGTH_BYTES - (
+            len(plain_text) % BLOCK_LENGTH_BYTES
+        )
         result = plain_text
         for i in range(pad_number):
             result += chr(pad_number)
@@ -125,11 +115,16 @@ class AbstractPBEWithMD5AndDES(ABC):
             position = message_length - pad_value
 
             # padding element, repeated `pad_value` number of times, as byte string
-            padding_elements = array.array('B', [pad_value] * pad_value).tostring()
+            padding_elements = array.array(
+                "B", [pad_value] * pad_value
+            ).tostring()
 
             # check if correctly padded
-            if pad_value == 0 or decrypted_message[-pad_value:] != padding_elements:
-                raise ValueError('Incorrect padding')
+            if (
+                pad_value == 0
+                or decrypted_message[-pad_value:] != padding_elements
+            ):
+                raise ValueError("Incorrect padding")
 
             return decrypted_message[:position]
 
@@ -137,7 +132,9 @@ class AbstractPBEWithMD5AndDES(ABC):
         return DES3 if self.triple_des else DES
 
     @abstractmethod
-    def _get_derived_key_and_iv(self, password, salt, cycles=DERIVED_KEY_ITERATIONS):
+    def _get_derived_key_and_iv(
+        self, password, salt, cycles=DERIVED_KEY_ITERATIONS
+    ):
         return None
 
 
@@ -145,7 +142,9 @@ class PBEWithMD5AndDES(AbstractPBEWithMD5AndDES):
 
     triple_des = False
 
-    def _get_derived_key_and_iv(self, password, salt, cycles=DERIVED_KEY_ITERATIONS):
+    def _get_derived_key_and_iv(
+        self, password, salt, cycles=DERIVED_KEY_ITERATIONS
+    ):
         """
         Returns tuple of dk(8 bytes) and iv(8 bytes) for DES
 
@@ -165,8 +164,9 @@ class PBEWithMD5AndDES(AbstractPBEWithMD5AndDES):
 
 
 class PBEWithMD5AndTripleDES(AbstractPBEWithMD5AndDES):
-
-    def _get_derived_key_and_iv(self, password, salt, cycles=DERIVED_KEY_ITERATIONS):
+    def _get_derived_key_and_iv(
+        self, password, salt, cycles=DERIVED_KEY_ITERATIONS
+    ):
         """
         Returns tuple of dk(24 bytes) and iv(8 bytes) for DES3 (Triple DES, DESede)
 
@@ -206,4 +206,3 @@ class PBEWithMD5AndTripleDES(AbstractPBEWithMD5AndDES):
 
         # key, iv
         return result[:24], result[24:]
-
